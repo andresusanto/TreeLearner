@@ -67,6 +67,11 @@ public class jFMain extends javax.swing.JFrame {
         jTextField1.setEditable(false);
 
         jButton2.setText("Filter: Resample");
+        jButton2.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jButton2ActionPerformed(evt);
+            }
+        });
 
         jLabel2.setText("Preprocess");
 
@@ -257,6 +262,9 @@ public class jFMain extends javax.swing.JFrame {
             jButton4.setEnabled(true);
             jButton6.setEnabled(true);
         } catch (Exception ex) {
+            jTextArea1.append("Model building failed ...\n");
+            jTextArea1.append(ex.getMessage());
+            jTextArea1.append("\n");
             jButton4.setEnabled(true);
             jButton6.setEnabled(false);
             model = null;
@@ -276,9 +284,13 @@ public class jFMain extends javax.swing.JFrame {
 
     private void jButton6ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton6ActionPerformed
         // TODO add your handling code here:
-        jFTester tester = new jFTester();
+        jFTester tester = new jFTester(training, model);
         tester.show();
     }//GEN-LAST:event_jButton6ActionPerformed
+
+    private void jButton2ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton2ActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_jButton2ActionPerformed
 
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
