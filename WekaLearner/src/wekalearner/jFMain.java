@@ -9,6 +9,10 @@ package wekalearner;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import weka.classifiers.Classifier;
+import weka.classifiers.bayes.NaiveBayes;
+import weka.classifiers.trees.Id3;
+import weka.classifiers.trees.J48;
+import weka.core.Debug;
 import weka.core.Instances;
 
 
@@ -73,10 +77,20 @@ public class jFMain extends javax.swing.JFrame {
         jButton3.setFont(new java.awt.Font("Tahoma", 1, 14)); // NOI18N
         jButton3.setText("Build Model");
         jButton3.setEnabled(false);
+        jButton3.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jButton3ActionPerformed(evt);
+            }
+        });
 
         jButton4.setFont(new java.awt.Font("Tahoma", 1, 14)); // NOI18N
         jButton4.setText("Save Model");
         jButton4.setEnabled(false);
+        jButton4.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jButton4ActionPerformed(evt);
+            }
+        });
 
         jButton5.setFont(new java.awt.Font("Tahoma", 1, 14)); // NOI18N
         jButton5.setText("Load Model");
@@ -89,6 +103,11 @@ public class jFMain extends javax.swing.JFrame {
         jButton6.setFont(new java.awt.Font("Tahoma", 1, 14)); // NOI18N
         jButton6.setText("Test Model");
         jButton6.setEnabled(false);
+        jButton6.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jButton6ActionPerformed(evt);
+            }
+        });
 
         jLabel4.setText("Log");
 
@@ -174,9 +193,11 @@ public class jFMain extends javax.swing.JFrame {
         openDialog.show();
         
         if (openDialog.fileName != ""){
+            model = (Classifier) Debug.loadFromFile(openDialog.fileName);
+            jTextArea1.append("Model loaded: ");
             jTextArea1.append(openDialog.fileName);
             jTextArea1.append("\n");
-            
+            jButton6.setEnabled(true);
         }
     }//GEN-LAST:event_jButton5ActionPerformed
 
@@ -198,16 +219,58 @@ public class jFMain extends javax.swing.JFrame {
                 jButton3.setEnabled(true);
             } catch (Exception ex) {
                 jTextField1.setText("");
-                jTextArea1.append("Fail to load: ");
+                jTextArea1.append("Fail to load: '");
                 jTextArea1.append(openDialog.fileName);
-                jTextArea1.append(" (is it a correct dataset?)\n");
+                jTextArea1.append("' (is it a correct dataset?)\n");
                 
                 jButton3.setEnabled(false);
             }
-
-            
         }
     }//GEN-LAST:event_jButton1ActionPerformed
+
+    private void jButton3ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton3ActionPerformed
+        // TODO add your handling code here:
+        switch (jComboBox1.getSelectedIndex()){
+            case 0: 
+                model = new NaiveBayes(); 
+                jTextArea1.append("Building NaiveBayes model from training data ...\n");
+                break;
+            case 1: 
+                model = new Id3(); 
+                jTextArea1.append("Building ID3 model from training data ...\n");
+                break;
+            case 2: 
+                model = new J48(); 
+                jTextArea1.append("Building J48 model from training data ...\n");
+                break;
+        }
+        
+        try {
+            model.buildClassifier(training);
+            jTextArea1.append("Model building is complete ...\n");
+            jButton4.setEnabled(true);
+            jButton6.setEnabled(true);
+        } catch (Exception ex) {
+            jButton4.setEnabled(true);
+            jButton6.setEnabled(false);
+            model = null;
+        }
+    }//GEN-LAST:event_jButton3ActionPerformed
+
+    private void jButton4ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton4ActionPerformed
+        jDSave saveDialog = new jDSave(this, true);
+        saveDialog.show();
+        if (saveDialog.fileName != ""){
+            Debug.saveToFile(saveDialog.fileName, model);
+            jTextArea1.append("Model is saved to: ");
+            jTextArea1.append(saveDialog.fileName);
+            jTextArea1.append("\n");
+        }
+    }//GEN-LAST:event_jButton4ActionPerformed
+
+    private void jButton6ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton6ActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_jButton6ActionPerformed
 
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
