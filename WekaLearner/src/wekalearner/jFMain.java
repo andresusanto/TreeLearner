@@ -194,10 +194,16 @@ public class jFMain extends javax.swing.JFrame {
         
         if (openDialog.fileName != ""){
             model = (Classifier) Debug.loadFromFile(openDialog.fileName);
-            jTextArea1.append("Model loaded: ");
-            jTextArea1.append(openDialog.fileName);
-            jTextArea1.append("\n");
-            jButton6.setEnabled(true);
+            if (model != null){
+                jTextArea1.append("Model loaded: ");
+                jTextArea1.append(openDialog.fileName);
+                jTextArea1.append("\n");
+                jButton6.setEnabled(true);
+            }else{
+                jTextArea1.append("Invalid Model: ");
+                jTextArea1.append(openDialog.fileName);
+                jTextArea1.append("\n");
+            }
         }
     }//GEN-LAST:event_jButton5ActionPerformed
 
@@ -270,6 +276,8 @@ public class jFMain extends javax.swing.JFrame {
 
     private void jButton6ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton6ActionPerformed
         // TODO add your handling code here:
+        jFTester tester = new jFTester();
+        tester.show();
     }//GEN-LAST:event_jButton6ActionPerformed
 
 
