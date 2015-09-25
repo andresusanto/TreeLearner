@@ -8,12 +8,15 @@ package wekalearner;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import weka.classifiers.Classifier;
 import weka.classifiers.bayes.NaiveBayes;
 import weka.classifiers.trees.Id3;
 import weka.classifiers.trees.J48;
 import weka.core.Debug;
 import weka.core.Instances;
+import weka.filters.supervised.instance.Resample;
 
 
 /**
@@ -290,6 +293,23 @@ public class jFMain extends javax.swing.JFrame {
 
     private void jButton2ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton2ActionPerformed
         // TODO add your handling code here:
+        if (training != null){
+            Resample sampler = new Resample();
+            try {
+                sampler.setInputFormat(training);
+                training = Resample.useFilter(training, sampler);
+                jTextArea1.append("Resample: data resampled! \n");
+            } catch (Exception ex) {
+                jTextArea1.append("Resample Error: ");
+                jTextArea1.append(ex.getMessage());
+                jTextArea1.append("\n");
+                
+            }
+            
+            
+        }else{
+            jTextArea1.append("Resample: No dataset loaded! \n");
+        }
     }//GEN-LAST:event_jButton2ActionPerformed
 
 
