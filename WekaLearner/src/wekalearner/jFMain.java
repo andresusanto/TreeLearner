@@ -6,12 +6,20 @@
 
 package wekalearner;
 
+import java.io.BufferedReader;
+import java.io.FileReader;
+import weka.classifiers.Classifier;
+import weka.core.Instances;
+
 
 /**
  *
  * @author Andre
  */
 public class jFMain extends javax.swing.JFrame {
+    
+    private Instances training = null;
+    private Classifier model = null;
 
     public jFMain() {
         initComponents();
@@ -64,6 +72,7 @@ public class jFMain extends javax.swing.JFrame {
 
         jButton3.setFont(new java.awt.Font("Tahoma", 1, 14)); // NOI18N
         jButton3.setText("Build Model");
+        jButton3.setEnabled(false);
 
         jButton4.setFont(new java.awt.Font("Tahoma", 1, 14)); // NOI18N
         jButton4.setText("Save Model");
@@ -176,10 +185,26 @@ public class jFMain extends javax.swing.JFrame {
         openDialog.show();
         
         if (openDialog.fileName != ""){
-            jTextField1.setText(openDialog.fileName);
-            jTextArea1.append("Dataset changed: ");
-            jTextArea1.append(openDialog.fileName);
-            jTextArea1.append("\n");
+            try {
+                BufferedReader reader = new BufferedReader(new FileReader(openDialog.fileName));
+                training = new Instances(reader);
+                training.setClassIndex(training.numAttributes() - 1);
+                
+                jTextField1.setText(openDialog.fileName);
+                jTextArea1.append("Dataset changed: ");
+                jTextArea1.append(openDialog.fileName);
+                jTextArea1.append("\n");
+                
+                jButton3.setEnabled(true);
+            } catch (Exception ex) {
+                jTextField1.setText("");
+                jTextArea1.append("Fail to load: ");
+                jTextArea1.append(openDialog.fileName);
+                jTextArea1.append(" (is it a correct dataset?)\n");
+                
+                jButton3.setEnabled(false);
+            }
+
             
         }
     }//GEN-LAST:event_jButton1ActionPerformed
