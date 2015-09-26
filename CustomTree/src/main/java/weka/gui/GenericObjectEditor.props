@@ -208,6 +208,7 @@ weka.classifiers.Classifier=\
  weka.classifiers.trees.DecisionStump,\
  weka.classifiers.trees.FT,\
  weka.classifiers.trees.Id3,\
+ weka.classifiers.trees.MyId3,\
  weka.classifiers.trees.J48,\
  weka.classifiers.trees.J48graft,\
  weka.classifiers.trees.LADTree,\
