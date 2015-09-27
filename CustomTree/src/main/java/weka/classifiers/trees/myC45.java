@@ -1,4 +1,4 @@
-// MYID3
+// MyC45
 // 13512018 - Tony
 // 13512028 - Andre Susanto
 
@@ -20,12 +20,38 @@ import weka.core.TechnicalInformation.Field;
 import weka.core.TechnicalInformation.Type;
 
 import java.util.Enumeration;
+import java.util.List;
+import java.util.ArrayList;
 
- 
-public class MyId3 extends Classifier implements TechnicalInformationHandler, Sourcable {
+
+public class myC45 extends Classifier implements TechnicalInformationHandler, Sourcable {
 	
+	
+	public static class Data {
+		public Attribute attribute;
+		public double value;
+
+		public Data(Attribute newAttr, double newVal) {
+			attribute = newAttr;
+			value = newVal;
+		}
+	}
+
+	public static class Rule {
+		public List<Data> data;
+		public double result;
+
+		public Rule(List<Data> newData, double newResult) {
+			data = new ArrayList<Data>();
+			for (int i = 0 ; i <newData.size();i++) {
+				data.add(newData.get(i));
+			}
+			result = newResult;
+		}
+	}
+
 	///////////////////////////////////////// HELPER FUNCTIONS ///////////////////////////////////////////////////////
-	
+
 	private double logarithm(double base, double x){
 		return Math.log(x) / Math.log(base);
 	}
@@ -127,7 +153,7 @@ public class MyId3 extends Classifier implements TechnicalInformationHandler, So
 	
 	// So that the GUI can give description about this classifier
 	public String globalInfo() {
-		return  "An implementation of ID3 Algorithm using Java. For more information see: \n\n" + getTechnicalInformation().toString();
+		return  "An implementation of C45 Algorithm using Java. For more information see: \n\n" + getTechnicalInformation().toString();
 	}
 
 	// Technical information about this classifier
@@ -165,8 +191,8 @@ public class MyId3 extends Classifier implements TechnicalInformationHandler, So
 	}
 
 	public String toString() {
-		if ((dist == null) && (childs == null)) return "MyId3: No model built yet.";
-		return "MyId3\n\n" + printTree(0);
+		if ((dist == null) && (childs == null)) return "MyC45: No model built yet.";
+		return "MyC45\n\n" + printTree(0);
 	}
 	
 	public String toSource(String className) throws Exception {
@@ -192,6 +218,87 @@ public class MyId3 extends Classifier implements TechnicalInformationHandler, So
 		data.deleteWithMissingClass();
 
 		constructTree(data);
+
+		// convert decision tree to rule
+		rules = new ArrayList<Rule>(); // initialize rules
+		List<Data> datas = new ArrayList<Data>(); // initialize datas as passing parameter for getRule
+		getRule(childs,datas);
+
+		
+		// prune the tree according to rules
+		float nowAccuracy = checkAccuracy(rules, data);
+		pruneTree(nowAccuracy, data); 
+	}
+
+	private void pruneTree(float accuracy, Instances instances) {
+		float nowAcc = accuracy;
+
+		for (int i = 0 ; i <rules.size();i++) {
+			for (int j = 0; j< rules.get(i).data.size();j++) {
+				Data tempData = new Data(rules.get(i).data.get(j).attribute,rules.get(i).data.get(j).value);
+				
+				rules.get(i).data.remove(j);
+
+				if (checkAccuracy(rules, instances) > (nowAcc)) { // accuracy improved
+					// go on
+				} else { // accuracy down
+					rules.get(i).data.add(j,tempData); // recover pruned data
+				}
+			}
+		}
+	}
+
+	private float checkAccuracy(List<Rule> rule, Instances instances) {
+		
+		Enumeration instEnum = instances.enumerateInstances();
+		int nInstance = instances.numInstances();
+		int nRight = 0;
+
+		while (instEnum.hasMoreElements()) {
+			Instance inst = (Instance) instEnum.nextElement();
+
+			for (int i = 0; i <rule.size();i++) {
+				boolean ok = true;
+				for (int j = 0 ; j<rule.get(i).data.size();j++) {
+					for (int k = 0 ; k < instances.numAttributes();k++) {
+						Data data = rule.get(i).data.get(j);
+						if (data.attribute == inst.attribute(k)) { // check if attribute is match
+							if (data.value != inst.value(data.attribute)) { // check the value
+								ok = false;
+								break;
+							}
+						}
+					}
+
+					if (!ok) break;
+				}
+
+				if (ok) nRight++;
+			}
+		}
+
+		float acc = nRight / nInstance;
+		return acc;
+	}
+
+	private void getRule(myC45[] tree, List<Data> datas)  
+	{
+		if (tree.length == 0) { // basis (leaf)
+			Rule r = new Rule(datas,classVal);
+			
+			rules.add(r);
+		}
+		else { // recursive
+			List<Data> listData = new ArrayList<Data>();
+			listData.addAll(datas);	
+
+			for (int i = 0 ; i < tree.length ;i++) { // iterate all child of tree
+				Data data = new Data(tree[i].attr,tree[i].classVal);
+				listData.add(data);
+
+				getRule(tree[i].childs,listData);
+			}
+		}
 	}
 
 	
@@ -230,9 +337,9 @@ public class MyId3 extends Classifier implements TechnicalInformationHandler, So
 			classAtt = data.classAttribute();
 		} else {
 			Instances[] removeFromInstance = removeFromInstance(data, attr);
-			childs = new MyId3[attr.numValues()];
+			childs = new myC45[attr.numValues()];
 			for (int j = 0; j < attr.numValues(); j++) {
-				childs[j] = new MyId3();
+				childs[j] = new myC45();
 				childs[j].constructTree(removeFromInstance[j]);
 			}
 		}
@@ -242,14 +349,39 @@ public class MyId3 extends Classifier implements TechnicalInformationHandler, So
 	/////////////////////////////////////////// CLASSIFY INSTANCES ////////////////////////////////////////////////////////
 
 	public double classifyInstance(Instance instance) throws NoSupportForMissingValuesException {
-		if (instance.hasMissingValue()) throw new NoSupportForMissingValuesException("MyId3: this classifier can't handle missing value.");
+		if (instance.hasMissingValue()) throw new NoSupportForMissingValuesException("MyC45: this classifier can't handle missing value.");
 		
-		if (attr == null) return classVal;
-		else
-			return childs[(int) instance.value(attr)].classifyInstance(instance);
+		//if (attr == null) return classVal;
+		//else {
+ 			//return childs[(int) instance.value(attr)].classifyInstance(instance);
+
+			double val = 0;
+
+			for (int i = 0; i <rules.size();i++) {
+				boolean ok = true;
+				for (int j = 0 ; j<rules.get(i).data.size();j++) {
+					for (int k = 0 ; k < instance.numAttributes();k++) {
+						Data data = rules.get(i).data.get(j);
+						if (data.attribute == instance.attribute(k)) { // check if attribute is match
+							if (data.value != instance.value(data.attribute)) { // check the value
+								ok = false;
+								break;
+							}
+						}
+					}
+				}
+
+				if (ok) {
+					val = rules.get(i).result;
+					break;
+				}
+			}
+
+			return val;
+		//}
 	}
 	
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	/// Attributes ///
 	
 	private Attribute classAtt;
 	private Attribute attr;
@@ -257,6 +389,7 @@ public class MyId3 extends Classifier implements TechnicalInformationHandler, So
 	private double classVal;
 	private double[] dist;
 	
-	private MyId3[] childs;
+	private myC45[] childs;
 
+	private List<Rule> rules;
 }
