@@ -20,49 +20,110 @@ import weka.core.TechnicalInformation.Type;
 
 import java.util.Enumeration;
 
-/**
- <!-- globalinfo-start -->
- * An implementation of ID3 Algorithm using JAVA and WEKA <br/>
- * <br/>
- * <p/>
- <!-- globalinfo-end -->
- *
- <!-- technical-bibtex-start -->
- * BibTeX:
- * <pre>
- * &#64;article{Quinlan1986,
- *    author = {R. Quinlan},
- *    journal = {Machine Learning},
- *    number = {1},
- *    pages = {81-106},
- *    title = {Induction of decision trees},
- *    volume = {1},
- *    year = {1986}
- * }
- * </pre>
- * <p/>
- <!-- technical-bibtex-end -->
- *
- <!-- options-start -->
- * Gunakan -D untuk debug mode <p/>
- * 
- * 
- <!-- options-end -->
- *
- * @author Andre Susanto (andre@andresusanto.info)
- * @version $Revision: 1 $ 
- */
- 
  
 public class MyId3 extends Classifier implements TechnicalInformationHandler, Sourcable {
+	
+	///////////////////////////////////////// HELPER FUNCTIONS ///////////////////////////////////////////////////////
+	
+	private double logarithm(double base, double x){
+		return Math.log(x) / Math.log(base);
+	}
+	
+	private String printTree(int cur_level) {
+		StringBuffer result = new StringBuffer();
 
-	static final long serialVersionUID = -2693678647096322561L;
-	private MyId3[] m_Successors;
-	private Attribute m_Attribute;
-	private double m_ClassValue;
-	private double[] m_Distribution;
-	private Attribute m_ClassAttribute;
+		if (attr == null) {
+			if (Instance.isMissingValue(classVal)) result.append(" ==> MISSING");
+			else result.append(" ==> " + classAtt.value((int) classVal));
+		} else {
+			for (int j = 0; j < attr.numValues(); j++) {
+				result.append("\n");
+				for (int i = 0; i < cur_level; i++) result.append("  -> ");
+				result.append("if (" + attr.name() + " = )" + attr.value(j));
+				result.append(childs[j].printTree(cur_level + 1));
+			}
+		}
+		return result.toString();
+	}
+	
+	private int maxInfoGain(double[] doubles) {
+		double cur_max = doubles[0];
+		int cur_index = 0;
 
+		for (int i = 1; i < doubles.length; i++) {
+			if ((doubles[i] > cur_max)) {
+				cur_index = i;
+				cur_max = doubles[i];
+			}
+		}
+
+		return cur_index;
+	}
+	
+	private void normalize(double[] doubles) {
+		double sum = 0;
+		for (double d : doubles) sum += d;
+		normalize(doubles, sum);
+	}
+
+	private void normalize(double[] doubles, double sum) {
+		if (Double.isNaN(sum)) throw new IllegalArgumentException("Array contains NaN");
+		if (sum == 0) throw new IllegalArgumentException("Array empty");
+		for (int i = 0; i < doubles.length; i++) doubles[i] /= sum;
+	}
+	
+	private double calcGAIN(Instances data, Attribute att) throws Exception {
+		double curGAIN = calcENTRO(data);
+		Instances[] removeFromInstance = removeFromInstance(data, att);
+		
+		for (int j = 0; j < att.numValues(); j++) {
+			if (removeFromInstance[j].numInstances() > 0) curGAIN -= ((double) removeFromInstance[j].numInstances() / (double) data.numInstances()) * calcENTRO(removeFromInstance[j]);
+			
+		}
+		return curGAIN;
+	}
+
+	private double calcENTRO(Instances data) throws Exception {
+		double [] classCounts = new double[data.numClasses()];
+		Enumeration instEnum = data.enumerateInstances();
+		
+		while (instEnum.hasMoreElements()) {
+			Instance inst = (Instance) instEnum.nextElement();
+			classCounts[(int) inst.classValue()]++;
+		}
+		
+		double entropy = 0;
+		for (int j = 0; j < data.numClasses(); j++) {
+			if (classCounts[j] > 0) {
+				entropy -= classCounts[j] * logarithm(2, classCounts[j]);
+			}
+		}
+		entropy /= (double) data.numInstances();
+		return entropy + logarithm(2, data.numInstances());
+	}
+
+	private Instances[] removeFromInstance(Instances data, Attribute att) {
+		Instances[] removeFromInstance = new Instances[att.numValues()];
+		for (int j = 0; j < att.numValues(); j++) {
+			removeFromInstance[j] = new Instances(data, data.numInstances());
+		}
+		Enumeration instEnum = data.enumerateInstances();
+		while (instEnum.hasMoreElements()) {
+			Instance inst = (Instance) instEnum.nextElement();
+			removeFromInstance[(int) inst.value(att)].add(inst);
+		}
+		for (int i = 0; i < removeFromInstance.length; i++) {
+			removeFromInstance[i].compactify();
+		}
+		return removeFromInstance;
+	}
+	
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	
+	
+	///////////////////////////////////////// RELATED TO WEKA GUI ////////////////////////////////////////////////////
+	
+	
 	// So that the GUI can give description about this classifier
 	public String globalInfo() {
 		return  "An implementation of ID3 Algorithm using Java. For more information see: \n\n" + getTechnicalInformation().toString();
@@ -102,9 +163,26 @@ public class MyId3 extends Classifier implements TechnicalInformationHandler, So
 		return result;
 	}
 
+	public String toString() {
+		if ((dist == null) && (childs == null)) return "MyId3: No model built yet.";
+		return "MyId3\n\n" + printTree(0);
+	}
+	
+	public String toSource(String className) throws Exception {
+		return "";
+	}
+	
+	public String getRevision() {
+		return RevisionUtils.extract("$Revision: 1 $");
+	}
+	
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	
+	
+	/////////////////////////////////// RELATED TO BUILDING MODEL ////////////////////////////////////////////////
+	
 	// Build the classifier
 	public void buildClassifier(Instances data) throws Exception {
-
 		// test the data with capabilities
 		getCapabilities().testWithFail(data);
 
@@ -112,241 +190,72 @@ public class MyId3 extends Classifier implements TechnicalInformationHandler, So
 		data = new Instances(data);
 		data.deleteWithMissingClass();
 
-		makeTree(data);
+		constructTree(data);
 	}
 
 	
-	private void makeTree(Instances data) throws Exception {
+	private void constructTree(Instances data) throws Exception {
 		// Check if no instances have reached this node.
 		if (data.numInstances() == 0) {
-			m_Attribute = null;
-			m_ClassValue = Instance.missingValue();
-			m_Distribution = new double[data.numClasses()];
+			attr = null;
+			classVal = Instance.missingValue();
+			dist = new double[data.numClasses()];
 			return;
 		}
 
 		// Compute attribute with maximum information gain.
-		double[] infoGains = new double[data.numAttributes()];
+		double[] informationGain = new double[data.numAttributes()];
 		Enumeration attEnum = data.enumerateAttributes();
 		
 		while (attEnum.hasMoreElements()) {
 			Attribute att = (Attribute) attEnum.nextElement();
-			infoGains[att.index()] = computeInfoGain(data, att);
+			informationGain[att.index()] = calcGAIN(data, att);
 		}
 		
-		m_Attribute = data.attribute(Utils.maxIndex(infoGains));
+		attr = data.attribute(maxInfoGain(informationGain));
 
 		// Make leaf if information gain is zero. 
 		// Otherwise create successors.
-		if (Utils.eq(infoGains[m_Attribute.index()], 0)) {
-			m_Attribute = null;
-			m_Distribution = new double[data.numClasses()];
+		if (informationGain[attr.index()] == 0) {
+			attr = null;
+			dist = new double[data.numClasses()];
 			Enumeration instEnum = data.enumerateInstances();
 			while (instEnum.hasMoreElements()) {
 				Instance inst = (Instance) instEnum.nextElement();
-				m_Distribution[(int) inst.classValue()]++;
+				dist[(int) inst.classValue()]++;
 			}
-			Utils.normalize(m_Distribution);
-			m_ClassValue = Utils.maxIndex(m_Distribution);
-			m_ClassAttribute = data.classAttribute();
+			Utils.normalize(dist);
+			classVal = maxInfoGain(dist);
+			classAtt = data.classAttribute();
 		} else {
-			Instances[] splitData = splitData(data, m_Attribute);
-			m_Successors = new MyId3[m_Attribute.numValues()];
-			for (int j = 0; j < m_Attribute.numValues(); j++) {
-				m_Successors[j] = new MyId3();
-				m_Successors[j].makeTree(splitData[j]);
+			Instances[] removeFromInstance = removeFromInstance(data, attr);
+			childs = new MyId3[attr.numValues()];
+			for (int j = 0; j < attr.numValues(); j++) {
+				childs[j] = new MyId3();
+				childs[j].constructTree(removeFromInstance[j]);
 			}
 		}
 	}
-
+	
+	
+	/////////////////////////////////////////// CLASSIFY INSTANCES ////////////////////////////////////////////////////////
 
 	public double classifyInstance(Instance instance) throws NoSupportForMissingValuesException {
 		if (instance.hasMissingValue()) throw new NoSupportForMissingValuesException("MyId3: this classifier can't handle missing value.");
 		
-		if (m_Attribute == null) {
-			return m_ClassValue;
-		} else {
-			return m_Successors[(int) instance.value(m_Attribute)].
-			classifyInstance(instance);
-		}
+		if (attr == null) return classVal;
+		else
+			return childs[(int) instance.value(attr)].classifyInstance(instance);
 	}
+	
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	
+	private Attribute classAtt;
+	private Attribute attr;
+	
+	private double classVal;
+	private double[] dist;
+	
+	private MyId3[] childs;
 
-	public double[] distributionForInstance(Instance instance) throws NoSupportForMissingValuesException {
-		if (instance.hasMissingValue()) throw new NoSupportForMissingValuesException("MyId3: this classifier can't handle missing value.");
-		if (m_Attribute == null) {
-			return m_Distribution;
-		} else { 
-			return m_Successors[(int) instance.value(m_Attribute)].
-			distributionForInstance(instance);
-		}
-	}
-
-  
-	public String toString() {
-
-		if ((m_Distribution == null) && (m_Successors == null)) {
-			return "MyId3: No model built yet.";
-		}
-		
-		return "MyId3\n\n" + toString(0);
-	}
-
-	private double computeInfoGain(Instances data, Attribute att) throws Exception {
-		double infoGain = computeEntropy(data);
-		Instances[] splitData = splitData(data, att);
-		
-		for (int j = 0; j < att.numValues(); j++) {
-			if (splitData[j].numInstances() > 0) {
-				infoGain -= ((double) splitData[j].numInstances() / (double) data.numInstances()) *
-				computeEntropy(splitData[j]);
-			}
-		}
-		return infoGain;
-	}
-
-	private double computeEntropy(Instances data) throws Exception {
-		double [] classCounts = new double[data.numClasses()];
-		Enumeration instEnum = data.enumerateInstances();
-		
-		while (instEnum.hasMoreElements()) {
-			Instance inst = (Instance) instEnum.nextElement();
-			classCounts[(int) inst.classValue()]++;
-		}
-		
-		double entropy = 0;
-		for (int j = 0; j < data.numClasses(); j++) {
-			if (classCounts[j] > 0) {
-				entropy -= classCounts[j] * Utils.log2(classCounts[j]);
-			}
-		}
-		entropy /= (double) data.numInstances();
-		return entropy + Utils.log2(data.numInstances());
-	}
-
-	private Instances[] splitData(Instances data, Attribute att) {
-		Instances[] splitData = new Instances[att.numValues()];
-		for (int j = 0; j < att.numValues(); j++) {
-			splitData[j] = new Instances(data, data.numInstances());
-		}
-		Enumeration instEnum = data.enumerateInstances();
-		while (instEnum.hasMoreElements()) {
-			Instance inst = (Instance) instEnum.nextElement();
-			splitData[(int) inst.value(att)].add(inst);
-		}
-		for (int i = 0; i < splitData.length; i++) {
-			splitData[i].compactify();
-		}
-		return splitData;
-	}
-
-
-	private String toString(int level) {
-		StringBuffer text = new StringBuffer();
-
-		if (m_Attribute == null) {
-			if (Instance.isMissingValue(m_ClassValue)) {
-				text.append(": null");
-			} else {
-				text.append(": " + m_ClassAttribute.value((int) m_ClassValue));
-			} 
-		} else {
-			for (int j = 0; j < m_Attribute.numValues(); j++) {
-				text.append("\n");
-				for (int i = 0; i < level; i++) {
-					text.append("|  ");
-				}
-				text.append(m_Attribute.name() + " = " + m_Attribute.value(j));
-				text.append(m_Successors[j].toString(level + 1));
-			}
-		}
-		return text.toString();
-	}
-
-	protected int toSource(int id, StringBuffer buffer) throws Exception {
-		int                 result;
-		int                 i;
-		int                 newID;
-		StringBuffer[]      subBuffers;
-
-		buffer.append("\n");
-		buffer.append("  protected static double node" + id + "(Object[] i) {\n");
-
-		// leaf?
-		if (m_Attribute == null) {
-			result = id;
-			if (Double.isNaN(m_ClassValue)) {
-				buffer.append("    return Double.NaN;");
-			} else {
-				buffer.append("    return " + m_ClassValue + ";");
-			}
-			if (m_ClassAttribute != null) {
-				buffer.append(" // " + m_ClassAttribute.value((int) m_ClassValue));
-			}
-			buffer.append("\n");
-			buffer.append("  }\n");
-		} else {
-			buffer.append("    checkMissing(i, " + m_Attribute.index() + ");\n\n");
-			buffer.append("    // " + m_Attribute.name() + "\n");
-		  
-			// subtree calls
-			subBuffers = new StringBuffer[m_Attribute.numValues()];
-			newID = id;
-			for (i = 0; i < m_Attribute.numValues(); i++) {
-				newID++;
-
-				buffer.append("    ");
-				if (i > 0) {
-					buffer.append("else ");
-				}
-				
-				buffer.append("if (((String) i[" + m_Attribute.index() 
-				+ "]).equals(\"" + m_Attribute.value(i) + "\"))\n");
-				buffer.append("      return node" + newID + "(i);\n");
-
-				subBuffers[i] = new StringBuffer();
-				newID = m_Successors[i].toSource(newID, subBuffers[i]);
-			}
-			
-			buffer.append("    else\n");
-			buffer.append("      throw new IllegalArgumentException(\"Value '\" + i["
-			  + m_Attribute.index() + "] + \"' is not allowed!\");\n");
-			buffer.append("  }\n");
-
-			// output subtree code
-			for (i = 0; i < m_Attribute.numValues(); i++) {
-				buffer.append(subBuffers[i].toString());
-			}
-			subBuffers = null;
-		  
-			result = newID;
-		}
-
-		return result;
-	}
-  
-	public String toSource(String className) throws Exception {
-		StringBuffer        result;
-		int                 id;
-
-		result = new StringBuffer();
-
-		result.append("class " + className + " {\n");
-		result.append("  private static void checkMissing(Object[] i, int index) {\n");
-		result.append("    if (i[index] == null)\n");
-		result.append("      throw new IllegalArgumentException(\"Null values "
-		+ "are not allowed!\");\n");
-		result.append("  }\n\n");
-		result.append("  public static double classify(Object[] i) {\n");
-		id = 0;
-		result.append("    return node" + id + "(i);\n");
-		result.append("  }\n");
-		toSource(id, result);
-		result.append("}\n");
-
-		return result.toString();
-	}
-  
-	public String getRevision() {
-		return RevisionUtils.extract("$Revision: 6404 $");
-	}
 }
